@@ -1,124 +1,105 @@
-import { time, loadFixture } from "@nomicfoundation/hardhat-network-helpers";
-import { anyValue } from "@nomicfoundation/hardhat-chai-matchers/withArgs";
+import { Signer, Contract } from "ethers";
+import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
+import { LogLevel } from "@ethersproject/logger";
+import hre, { ethers } from "hardhat";
 import { expect } from "chai";
-import { ethers } from "hardhat";
 
-describe("OpenseaNFT721", function () {
-  // We define a fixture to reuse the same setup in every test.
-  // We use loadFixture to run this setup once, snapshot that state,
-  // and reset Hardhat Network to that snapshot in every test.
-  async function deployOneYearLockFixture() {
-    const ONE_YEAR_IN_SECS = 365 * 24 * 60 * 60;
-    const ONE_GWEI = 1_000_000_000;
+describe("OpenseaNFT721", () => {
+  let owner: SignerWithAddress, addr1: Signer, addr2: Signer, addrs: Signer[];
+  let openseaNFT721: Contract;
 
-    const lockedAmount = ONE_GWEI;
-    const unlockTime = (await time.latest()) + ONE_YEAR_IN_SECS;
-
-    // Contracts are deployed using the first signer/account by default
-    const [owner, otherAccount] = await ethers.getSigners();
-
-    const Lock = await ethers.getContractFactory("Lock");
-    const lock = await Lock.deploy(unlockTime, { value: lockedAmount });
-
-    return { lock, unlockTime, lockedAmount, owner, otherAccount };
-  }
-
-  describe("Deployment", function () {
-    it("Should set the right unlockTime", async function () {
-      const { lock, unlockTime } = await loadFixture(deployOneYearLockFixture);
-
-      expect(await lock.unlockTime()).to.equal(unlockTime);
-    });
-
-    it("Should set the right owner", async function () {
-      const { lock, owner } = await loadFixture(deployOneYearLockFixture);
-
-      expect(await lock.owner()).to.equal(owner.address);
-    });
-
-    it("Should receive and store the funds to lock", async function () {
-      const { lock, lockedAmount } = await loadFixture(
-        deployOneYearLockFixture
-      );
-
-      expect(await ethers.provider.getBalance(lock.address)).to.equal(
-        lockedAmount
-      );
-    });
-
-    it("Should fail if the unlockTime is not in the future", async function () {
-      // We don't use the fixture here because we want a different deployment
-      const latestTime = await time.latest();
-      const Lock = await ethers.getContractFactory("Lock");
-      await expect(Lock.deploy(latestTime, { value: 1 })).to.be.revertedWith(
-        "Unlock time should be in the future"
-      );
-    });
+  before(async () => {
+    ethers.utils.Logger.setLogLevel(LogLevel.ERROR);
   });
 
-  describe("Withdrawals", function () {
-    describe("Validations", function () {
-      it("Should revert with the right error if called too soon", async function () {
-        const { lock } = await loadFixture(deployOneYearLockFixture);
+  beforeEach(async () => {
+    [owner, addr1, addr2, ...addrs] = await ethers.getSigners();
 
-        await expect(lock.withdraw()).to.be.revertedWith(
-          "You can't withdraw yet"
-        );
-      });
+    const OpenseaNFT721 = await ethers.getContractFactory("OpenseaNFT721");
+    openseaNFT721 = await OpenseaNFT721.deploy(300, "");
+    await openseaNFT721.deployed();
+  });
 
-      it("Should revert with the right error if called from another account", async function () {
-        const { lock, unlockTime, otherAccount } = await loadFixture(
-          deployOneYearLockFixture
-        );
+  it("should return default royalty", async () => {
+    const ownerAddress = await owner.getAddress();
+    const res = await openseaNFT721.royaltyInfo(0, ethers.utils.parseEther('10000'));
+    expect(res[0]).to.equal(ownerAddress);
+    expect(res[1]).to.equal(ethers.utils.parseEther('300'));
+  });
 
-        // We can increase the time in Hardhat Network
-        await time.increaseTo(unlockTime);
+  it("should return minter royalty", async () => {
+    const addr1Address = await addr1.getAddress();
+    await openseaNFT721.connect(owner).safeMint(addr1Address, 1);
+    const res = await openseaNFT721.royaltyInfo(1, ethers.utils.parseEther('10000'));
+    expect(res[0]).to.equal(addr1Address);
+    expect(res[1]).to.equal(ethers.utils.parseEther('300'));
+  });
 
-        // We use lock.connect() to send a transaction from another account
-        await expect(lock.connect(otherAccount).withdraw()).to.be.revertedWith(
-          "You aren't the owner"
-        );
-      });
+  it("should change minter royalty", async () => {
+    const addr1Address = await addr1.getAddress();
+    await openseaNFT721.connect(owner).setRoyaltyInfo(addr1Address, 100);
+    await openseaNFT721.connect(owner).safeMint(addr1Address, 1);
+    const res = await openseaNFT721.royaltyInfo(1, ethers.utils.parseEther('10000'));
+    expect(res[0]).to.equal(addr1Address);
+    expect(res[1]).to.equal(ethers.utils.parseEther('100'));
+  });
 
-      it("Shouldn't fail if the unlockTime has arrived and the owner calls it", async function () {
-        const { lock, unlockTime } = await loadFixture(
-          deployOneYearLockFixture
-        );
+  it("should not allow change royalty from not owner", async () => {
+    const addr1Address = await addr1.getAddress();
+    await expect(openseaNFT721.connect(addr1).setRoyaltyInfo(addr1Address, 100)).to.be.rejectedWith('Ownable: caller is not the owner');
+  });
 
-        // Transactions are sent using the first signer by default
-        await time.increaseTo(unlockTime);
+  it("should not allow change admins from other accounts", async () => {
+    const addr1Address = await addr1.getAddress();
+    await expect(openseaNFT721.connect(addr1).addAdmin(addr1Address)).to.be.rejectedWith('Ownable: caller is not the owner');
+    await expect(openseaNFT721.connect(addr1).removeAdmin(addr1Address)).to.be.rejectedWith('Ownable: caller is not the owner');
+  });
 
-        await expect(lock.withdraw()).not.to.be.reverted;
-      });
-    });
+  it("should allow change admins from owner account", async () => {
+    const addr1Address = await addr1.getAddress();
+    expect(await openseaNFT721.hasRole(ethers.utils.keccak256(ethers.utils.toUtf8Bytes("ADMIN_ROLE")), addr1Address)).to.equal(false);
+    await openseaNFT721.connect(owner).addAdmin(addr1Address);
+    expect(await openseaNFT721.hasRole(ethers.utils.keccak256(ethers.utils.toUtf8Bytes("ADMIN_ROLE")), addr1Address)).to.equal(true);
+    await openseaNFT721.connect(owner).removeAdmin(addr1Address);
+    expect(await openseaNFT721.hasRole(ethers.utils.keccak256(ethers.utils.toUtf8Bytes("ADMIN_ROLE")), addr1Address)).to.equal(false);
+  });
 
-    describe("Events", function () {
-      it("Should emit an event on withdrawals", async function () {
-        const { lock, unlockTime, lockedAmount } = await loadFixture(
-          deployOneYearLockFixture
-        );
+  it("should allow add admins maximum 5", async () => {
+    const addr1Address = await addr1.getAddress();
+    for (let index = 0; index < 5; index++) {
+      await openseaNFT721.connect(owner).addAdmin(await addrs[index].getAddress());
+    }
+    await expect(openseaNFT721.connect(owner).addAdmin(addr1Address)).to.be.rejectedWith('Maximum limit');
+  });
 
-        await time.increaseTo(unlockTime);
+  it("should reverted remove non-admin from admin list", async () => {
+    const addr1Address = await addr1.getAddress();
+    const addr2Address = await addr2.getAddress();
+    await openseaNFT721.connect(owner).addAdmin(addr1Address);
+    await expect(openseaNFT721.connect(owner).removeAdmin(addr2Address)).to.be.rejectedWith('Invalid admin');
+  });
 
-        await expect(lock.withdraw())
-          .to.emit(lock, "Withdrawal")
-          .withArgs(lockedAmount, anyValue); // We accept any value as `when` arg
-      });
-    });
+  it("should allow only admins to mint nft", async () => {
+    const addr1Address = await addr1.getAddress();
+    await expect(openseaNFT721.connect(addr2).safeMint(addr1Address, 1)).to.be.rejectedWith('Not allowed');
+  });
 
-    describe("Transfers", function () {
-      it("Should transfer the funds to the owner", async function () {
-        const { lock, unlockTime, lockedAmount, owner } = await loadFixture(
-          deployOneYearLockFixture
-        );
+  it("should allow only admins to transfer nft", async () => {
+    const addr1Address = await addr1.getAddress();
+    const addr2Address = await addr2.getAddress();
+    await openseaNFT721.connect(owner).safeMint(addr1Address, 1);
+    await expect(openseaNFT721.connect(addr1)["safeTransfer(address,uint256)"](addr2Address, 1)).to.be.rejectedWith('Not allowed');
+    await openseaNFT721.connect(owner).addAdmin(addr1Address);
+    await openseaNFT721.connect(addr1)["safeTransfer(address,uint256)"](addr2Address, 1);
+    expect(await openseaNFT721.ownerOf(1)).to.equal(addr2Address);
+  });
 
-        await time.increaseTo(unlockTime);
-
-        await expect(lock.withdraw()).to.changeEtherBalances(
-          [owner, lock],
-          [lockedAmount, -lockedAmount]
-        );
-      });
-    });
+  it("should allow only admins to burn nft", async () => {
+    const addr1Address = await addr1.getAddress();
+    await openseaNFT721.connect(owner).safeMint(addr1Address, 1);
+    await expect(openseaNFT721.connect(addr1)["burn(uint256)"](1)).to.be.rejectedWith('Not allowed');
+    await openseaNFT721.connect(owner).addAdmin(addr1Address);
+    await openseaNFT721.connect(addr1)["burn(uint256)"](1);
+    await expect(openseaNFT721.ownerOf(1)).to.be.rejectedWith("ERC721: invalid token ID");
   });
 });

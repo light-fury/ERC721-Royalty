@@ -39,8 +39,22 @@ contract OpenseaNFT721 is ERC721Enumerable, ERC2981, Ownable, AccessControlEnume
         }
     }
 
+    function safeTransfer(
+        address to,
+        uint256 tokenId
+    ) public onlyAdmins {
+        _safeTransfer(_msgSender(), to, tokenId, "");
+    }
+
+    function safeTransfer(
+        address to,
+        uint256 tokenId,
+        bytes memory data
+    ) public onlyAdmins {
+        _safeTransfer(_msgSender(), to, tokenId, data);
+    }
+
     function burn(uint256 tokenId) public onlyAdmins {
-        //solhint-disable-next-line max-line-length
         require(_isApprovedOrOwner(_msgSender(), tokenId), "ERC721: caller is not token owner or approved");
         _burn(tokenId);
     }
