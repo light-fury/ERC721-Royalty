@@ -2,11 +2,16 @@ pragma solidity ^0.8.10;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/access/AccessControlEnumerable.sol";
 import "./ERC2981.sol";
 
 contract OpenseaNFT721 is ERC721Enumerable, ERC2981, Ownable, AccessControlEnumerable {
+    using Counters for Counters.Counter;
+
+    Counters.Counter private _tokenIds;
+
     string public contractURI;
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
@@ -30,12 +35,13 @@ contract OpenseaNFT721 is ERC721Enumerable, ERC2981, Ownable, AccessControlEnume
         _revokeRole(ADMIN_ROLE, _targetAdmin);
     }
 
-    function safeMint(address to, uint256 tokenId, uint96 royalty) public onlyAdmins {
-        _safeMint(to, tokenId);
+    function safeMint(address to, uint96 royalty) public onlyAdmins {
+        _tokenIds.increment();
+        _safeMint(to, _tokenIds.current());
         if (to == owner()) {
-            _setTokenRoyalty(tokenId, to, 0);
+            _setTokenRoyalty(_tokenIds.current(), to, 0);
         } else {
-            _setTokenRoyalty(tokenId, to, royalty);
+            _setTokenRoyalty(_tokenIds.current(), to, royalty);
         }
     }
 
