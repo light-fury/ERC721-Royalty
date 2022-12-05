@@ -71,7 +71,6 @@ abstract contract ERC2981 is IERC2981, ERC165 {
      */
     function _setDefaultRoyalty(address receiver, uint96 feeNumerator) internal virtual {
         require(feeNumerator <= _feeDenominator(), "ERC2981: royalty fee will exceed salePrice");
-        require(receiver != address(0), "ERC2981: invalid receiver");
 
         _defaultRoyaltyInfo = RoyaltyInfo(receiver, feeNumerator);
     }

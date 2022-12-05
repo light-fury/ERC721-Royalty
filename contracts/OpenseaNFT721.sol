@@ -11,7 +11,7 @@ contract OpenseaNFT721 is ERC721Enumerable, ERC2981, Ownable, AccessControlEnume
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
     constructor(uint96 _royaltyFeesInBips, string memory _contractURI) ERC721("OpenseaNFT721", "ON2") {
-        setRoyaltyInfo(owner(), _royaltyFeesInBips);
+        _setDefaultRoyalty(address(0), _royaltyFeesInBips);
         contractURI = _contractURI;
     }
 
@@ -30,12 +30,12 @@ contract OpenseaNFT721 is ERC721Enumerable, ERC2981, Ownable, AccessControlEnume
         _revokeRole(ADMIN_ROLE, _targetAdmin);
     }
 
-    function safeMint(address to, uint256 tokenId) public onlyAdmins {
+    function safeMint(address to, uint256 tokenId, uint96 royalty) public onlyAdmins {
         _safeMint(to, tokenId);
         if (to == owner()) {
             _setTokenRoyalty(tokenId, to, 0);
         } else {
-            _setTokenRoyalty(tokenId, to, _getDefaultRoyalty().royaltyFraction);
+            _setTokenRoyalty(tokenId, to, royalty);
         }
     }
 
@@ -57,10 +57,6 @@ contract OpenseaNFT721 is ERC721Enumerable, ERC2981, Ownable, AccessControlEnume
     function burn(uint256 tokenId) public onlyAdmins {
         require(_isApprovedOrOwner(_msgSender(), tokenId), "ERC721: caller is not token owner or approved");
         _burn(tokenId);
-    }
-
-    function setRoyaltyInfo(address _receiver, uint96 _royaltyFeesInBips) public onlyOwner {
-        _setDefaultRoyalty(_receiver, _royaltyFeesInBips);
     }
 
     function setContractURI(string calldata _contractURI) public onlyOwner {

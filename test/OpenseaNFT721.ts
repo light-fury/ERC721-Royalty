@@ -23,13 +23,13 @@ describe("OpenseaNFT721", () => {
   it("should return default royalty", async () => {
     const ownerAddress = await owner.getAddress();
     const res = await openseaNFT721.royaltyInfo(0, ethers.utils.parseEther('10000'));
-    expect(res[0]).to.equal(ownerAddress);
+    expect(res[0]).to.equal(ethers.constants.AddressZero);
     expect(res[1]).to.equal(ethers.utils.parseEther('300'));
   });
 
   it("should return minter royalty", async () => {
     const addr1Address = await addr1.getAddress();
-    await openseaNFT721.connect(owner).safeMint(addr1Address, 1);
+    await openseaNFT721.connect(owner).safeMint(addr1Address, 1, 300);
     const res = await openseaNFT721.royaltyInfo(1, ethers.utils.parseEther('10000'));
     expect(res[0]).to.equal(addr1Address);
     expect(res[1]).to.equal(ethers.utils.parseEther('300'));
@@ -37,16 +37,10 @@ describe("OpenseaNFT721", () => {
 
   it("should change minter royalty", async () => {
     const addr1Address = await addr1.getAddress();
-    await openseaNFT721.connect(owner).setRoyaltyInfo(addr1Address, 100);
-    await openseaNFT721.connect(owner).safeMint(addr1Address, 1);
+    await openseaNFT721.connect(owner).safeMint(addr1Address, 1, 100);
     const res = await openseaNFT721.royaltyInfo(1, ethers.utils.parseEther('10000'));
     expect(res[0]).to.equal(addr1Address);
     expect(res[1]).to.equal(ethers.utils.parseEther('100'));
-  });
-
-  it("should not allow change royalty from not owner", async () => {
-    const addr1Address = await addr1.getAddress();
-    await expect(openseaNFT721.connect(addr1).setRoyaltyInfo(addr1Address, 100)).to.be.rejectedWith('Ownable: caller is not the owner');
   });
 
   it("should not allow change admins from other accounts", async () => {
@@ -81,13 +75,13 @@ describe("OpenseaNFT721", () => {
 
   it("should allow only admins to mint nft", async () => {
     const addr1Address = await addr1.getAddress();
-    await expect(openseaNFT721.connect(addr2).safeMint(addr1Address, 1)).to.be.rejectedWith('Not allowed');
+    await expect(openseaNFT721.connect(addr2).safeMint(addr1Address, 1, 300)).to.be.rejectedWith('Not allowed');
   });
 
   it("should allow only admins to transfer nft", async () => {
     const addr1Address = await addr1.getAddress();
     const addr2Address = await addr2.getAddress();
-    await openseaNFT721.connect(owner).safeMint(addr1Address, 1);
+    await openseaNFT721.connect(owner).safeMint(addr1Address, 1, 300);
     await expect(openseaNFT721.connect(addr1)["safeTransfer(address,uint256)"](addr2Address, 1)).to.be.rejectedWith('Not allowed');
     await openseaNFT721.connect(owner).addAdmin(addr1Address);
     await openseaNFT721.connect(addr1)["safeTransfer(address,uint256)"](addr2Address, 1);
@@ -96,7 +90,7 @@ describe("OpenseaNFT721", () => {
 
   it("should allow only admins to burn nft", async () => {
     const addr1Address = await addr1.getAddress();
-    await openseaNFT721.connect(owner).safeMint(addr1Address, 1);
+    await openseaNFT721.connect(owner).safeMint(addr1Address, 1, 300);
     await expect(openseaNFT721.connect(addr1)["burn(uint256)"](1)).to.be.rejectedWith('Not allowed');
     await openseaNFT721.connect(owner).addAdmin(addr1Address);
     await openseaNFT721.connect(addr1)["burn(uint256)"](1);
