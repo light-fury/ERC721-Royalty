@@ -16,7 +16,7 @@ describe("OpenseaNFT721", () => {
     [owner, addr1, addr2, ...addrs] = await ethers.getSigners();
 
     const OpenseaNFT721 = await ethers.getContractFactory("OpenseaNFT721");
-    openseaNFT721 = await OpenseaNFT721.deploy(300, "");
+    openseaNFT721 = await OpenseaNFT721.deploy(300, "", "");
     await openseaNFT721.deployed();
   });
 
@@ -95,5 +95,14 @@ describe("OpenseaNFT721", () => {
     await openseaNFT721.connect(owner).addAdmin(addr1Address);
     await openseaNFT721.connect(addr1)["burn(uint256)"](1);
     await expect(openseaNFT721.ownerOf(1)).to.be.rejectedWith("ERC721: invalid token ID");
+  });
+
+  it("should return correct illegal token uri", async () => {
+    const addr1Address = await addr1.getAddress();
+    await openseaNFT721.connect(owner).safeMint(addr1Address, 300);
+    await openseaNFT721.connect(owner).setIllegalURI("https://123");
+    expect(await openseaNFT721.tokenURI(1)).to.equal("");
+    await openseaNFT721.connect(owner).burn(1);
+    expect(await openseaNFT721.tokenURI(1)).to.equal("https://123");
   });
 });

@@ -2,7 +2,7 @@ import { ethers } from "hardhat";
 
 async function main() {
   const OpenseaNFT721 = await ethers.getContractFactory("OpenseaNFT721");
-  const openseaNFT721 = await OpenseaNFT721.deploy(300, "");
+  const openseaNFT721 = await OpenseaNFT721.deploy(300, "", "");
 
   await openseaNFT721.deployed();
 
