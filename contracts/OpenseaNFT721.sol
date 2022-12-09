@@ -18,7 +18,11 @@ contract OpenseaNFT721 is ERC721Enumerable, ERC2981, Ownable, AccessControlEnume
     string public illegalURI;
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
-    constructor(uint96 _royaltyFeesInBips, string memory _contractURI, string memory _illegalURI) ERC721("OpenseaNFT721", "ON2") {
+    constructor(
+        uint96 _royaltyFeesInBips,
+        string memory _contractURI,
+        string memory _illegalURI
+    ) ERC721("OpenseaNFT721", "ON2") {
         _setDefaultRoyalty(address(0), _royaltyFeesInBips);
         contractURI = _contractURI;
         illegalURI = _illegalURI;

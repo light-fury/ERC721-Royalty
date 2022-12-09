@@ -21,7 +21,7 @@ import "@openzeppelin/contracts/utils/introspection/ERC165.sol";
  *
  * _Available since v4.5._
  */
-abstract contract ERC2981 is IERC2981, ERC165 {
+contract ERC2981 is IERC2981, ERC165 {
     struct RoyaltyInfo {
         address receiver;
         uint96 royaltyFraction;
